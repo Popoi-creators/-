@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мұнай базасы: Басқару және Аналитика</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary: #0056b3;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --light: #f8f9fa;
+            --dark: #343a40;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #eef2f7;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        h1, h2, h3 { margin: 10px 0; color: var(--primary); }
+
+        /* Система уведомлений */
+        .alert-container {
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            background-color: #fff;
+            border-left: 5px solid var(--danger);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-weight: bold;
+            color: var(--danger);
+        }
+
+        /* Сетка блоков */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Формы */
+        label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9em; }
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 15px;
+        }
+
+        button:hover { background-color: #004494; }
+        .btn-success { background-color: var(--success); }
+        .btn-success:hover { background-color: #218838; }
+
+        /* Таблицы */
+        .table-container {
+            overflow-x: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th { background-color: var(--light); color: var(--primary); }
+
+        /* Графики */
+        .chart-box {
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🛢️ Мұнай базасын басқару жүйесі (ERP)</h1>
+        <p>Ақпараттық жүйелер мен дерекқорларды автоматтандыру жобасы</p>
+    </header>
+
+    {% if alerts %}
+    <div class="alert-container">
+        {% for alert in alerts %}
+        <div class="alert">📢 {{ alert }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid">
+        <div class="card">
+            <h3>📊 Өнімдердің үлесі</h3>
+            <div class="chart-box">
+                <canvas id="fuelPieChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h3>📈 Резервуарлар деңгейі</h3>
+            <div class="chart-box">
+                <canvas id="tankBarChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>🔄 Операция тіркеу</h3>
+            <form action="/add_transaction" method="POST">
+                <label>Операция түрі:</label>
+                <select name="trans_type">
+                    <option value="Кіріс">Кіріс (Приход)</option>
+                    <option value="Шығыс">Шығыс (Расход)</option>
+                </select>
+
+                <label>Өнім:</label>
+                <select name="product_id">
+                    {% for p in products %}
+                    <option value="{{ p.Product_ID }}">{{ p.Name }} ({{ p.Grade }})</option>
+                    {% endfor %}
+                </select>
+
+                <label>Контрагент:</label>
+                <select name="partner_id">
+                    {% for c in partners %}
+                    <option value="{{ c.Partner_ID }}">{{ c.Legal_Name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label>Резервуар:</label>
+                <select name="tank_id">
+                    {% for t in tanks %}
+                    <option value="{{ t.Tank_ID }}">Резервуар #{{ t.Tank_ID }} (Бос: {{ t.Max_Capacity - t.Current_Volume }} м³)</option>
+                    {% endfor %}
+                </select>
+
+                <label>Көлемі (м³):</label>
+                <input type="number" name="volume" step="0.01" required>
+
+                <button type="submit" class="btn-success">Транзакцияны сақтау</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>📋 Анықтамалықтарды толтыру</h3>
+            
+            <form action="/add_tank" method="POST" style="margin-bottom: 20px;">
+                <label>Жаңа резервуар:</label>
+                <input type="text" name="tank_type" placeholder="Түрі (мысалы, Жерүсті)" required>
+                <input type="number" name="max_capacity" placeholder="Сыйымдылығы (м³)" required>
+                <button type="submit">Резервуарды қосу</button>
+            </form>
+
+            <form action="/add_counterparty" method="POST">
+                <label>Жаңа контрагент:</label>
+                <input type="text" name="name" placeholder="Компания атауы" required>
+                <input type="text" name="bin" placeholder="БСН (БИН)" required>
+                <select name="role">
+                    <option value="Жеткізуші">Жеткізуші</option>
+                    <option value="Сатып алушы">Сатып алушы</option>
+                </select>
+                <button type="submit">Серіктесті қосу</button>
+            </form>
+        </div>
+    </div>
+
+    <h2>📊 Резервуарлар мониторингі</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Түрі</th>
+                    <th>Сыйымдылық</th>
+                    <th>Ағымдағы көлем</th>
+                    <th>Толу деңгейі</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tank in tanks %}
+                <tr>
+                    <td>#{{ tank.Tank_ID }}</td>
+                    <td>{{ tank.Tank_Type }}</td>
+                    <td>{{ tank.Max_Capacity }} м³</td>
+                    <td><strong>{{ tank.Current_Volume }} м³</strong></td>
+                    <td>
+                        {% set percent = (tank.Current_Volume / tank.Max_Capacity * 100) | int %}
+                        <div style="background: #eee; width: 100px; height: 10px; border-radius: 5px;">
+                            <div style="background: {{ 'red' if percent > 90 else 'green' }}; width: {{ percent }}%; height: 10px; border-radius: 5px;"></div>
+                        </div>
+                        {{ percent }}%
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2>📜 Транзакциялар тарихы</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Уақыты</th>
+                    <th>Түрі</th>
+                    <th>Өнім</th>
+                    <th>Көлемі</th>
+                    <th>Контрагент</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tr in transactions %}
+                <tr>
+                    <td>{{ tr.Transaction_Date }}</td>
+                    <td style="color: {{ 'green' if tr.Trans_Type == 'Кіріс' else 'red' }}"><b>{{ tr.Trans_Type }}</b></td>
+                    <td>{{ tr.ProductName }}</td>
+                    <td>{{ tr.Volume }} м³</td>
+                    <td>{{ tr.PartnerName }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 1. Pie Chart - Распределение топлива
+    const fuelData = {{ fuel_stats | tojson }};
+    new Chart(document.getElementById('fuelPieChart'), {
+        type: 'pie',
+        data: {
+            labels: fuelData.map(item => item.Name),
+            datasets: [{
+                data: fuelData.map(item => item.Total_Volume),
+                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // 2. Bar Chart - Загрузка резервуаров
+    const tankData = {{ tanks | tojson }};
+    new Chart(document.getElementById('tankBarChart'), {
+        type: 'bar',
+        data: {
+            labels: tankData.map(t => 'R-' + t.Tank_ID),
+            datasets: [{
+                label: 'Заполнено (м³)',
+                data: tankData.map(t => t.Current_Volume),
+                backgroundColor: '#4e73df'
+            }, {
+                label: 'Свободно (м³)',
+                data: tankData.map(t => t.Max_Capacity - t.Current_Volume),
+                backgroundColor: '#eaecf4'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true } }
+        }
+    });
+</script>
+
+</body>
+</html>
